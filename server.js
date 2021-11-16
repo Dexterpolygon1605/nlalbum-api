@@ -1,84 +1,103 @@
-const express = require('express')
+const express = require('express');
+const bcrypt = require('bcrypt-nodejs');
+const cors = require('cors');
+const knex = require('knex');
+
+const db = knex({
+    client: 'pg',
+    connection: {
+        host: '127.0.0.1',
+        port: 5432,
+        user: 'postgres',
+        password: 's2v2020',
+        database: 'nlalbum'
+    }
+});
+
 
 const app = express();
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
+app.use(cors());
 
-const database = {
-    user: [
-        {
-            id: '123',
-            name: 'John',
-            email: 'john@gmail.com',
-            password: 'cookies',
-            numFavorites: 0,
-            joined: new Date()
-        },
-        {
-            id: '124',
-            name: 'Sally',
-            email: 'sally@gmail.com',
-            password: 'bananas',
-            numFavorites: 0,
-            joined: new Date()
-        }
-    ]
-}
 
 app.get('/', (req, res) => {
-    res.send(database.user)
+    res.send(database.users)
 })
 
 app.post('/signin', (req, res) => {
-    if (req.body.email === database.user[0].email && req.body.password === database.user[0].password) {
-        res.json('success')
-    } else {
-        res.status(400).json('erro logging in');
-    }
+    db.select('email', 'hash').from('login')
+        .where('email', '=', req.body.email)
+        .then(data => {
+            const isValid = bcrypt.compareSync(req.body.password, data[0].hash);
+            if (isValid) {
+                return db.select('*').from('users')
+                    .where('email', '=', req.body.email)
+                    .then(user => {
+                        res.json(user[0])
+                    })
+                    .catch(err => res.status(400).json('unable to get user'))
+            } else {
+                res.status(400).json('wrong credentials')
+            }
+        })
+        .catch(err => res.status(400).json('wrong credentials'))
 })
 
 app.post('/register', (req, res) => {
     const { email, name, password } = req.body;
-    database.user.push({
-        id: '125',
-        name: name,
-        email: email,
-        password: password,
-        numFavorites: 0,
-        joined: new Date()
+    const hash = bcrypt.hashSync(password);
+    db.transaction(trx => {
+        trx.insert({
+            hash: hash,
+            email: email
+        })
+            .into('login')
+            .returning('email')
+            .then(loginEmail => {
+                return trx('users')
+                    .returning('*')
+                    .insert({
+                        email: loginEmail[0],
+                        name: name,
+                        joined: new Date()
+                    })
+                    .then(user => {
+                        res.json(user[0]);
+                    })
+            })
+            .then(trx.commit)
+            .catch(trx.rollback)
     })
-    res.json(database.user[database.user.length - 1]);
+
+        .catch(err => res.status(400).json('unable to register'))
 })
 
 
 app.get('/profile/:id', (req, res) => {
     const { id } = req.params;
-    let found = false;
-    database.user.forEach(user => {
-        if (user.id === id) {
-            found = true;
-            return res.json(user);
-        }
-    })
-    if (!found) {
-        res.status(404).json('not found buddy')
-    }
+    db.select('*').from('users')
+        .where({ id }) //the same as id: id
+        .then(user => {
+            if (user.length) {
+                res.json(user[0])
+            } else {
+                res.status(400).json('not found buddy')
+            }
+        })
+        .catch(err => res.status(404).json('erro getting user'))
 })
 
 
 app.put('/favorites', (req, res) => {
     const { id } = req.body;
-    let found = false;
-    database.user.forEach(user => {
-        if (user.id === id) {
-            found = true;
-            user.numFavorites++;
-            return res.json(user.numFavorites);
-        }
-    })
-    if (!found) {
-        res.status(404).json('not found buddy')
-    }
+    db('users').where('id', '=', id)
+        .increment('favorites', 1)
+        .returning('favorites')
+        .then(favorites => {
+            res.json(favorites[0]);
+        })
+        .catch(err => res.status(400).json('unable to get favorites'))
 })
 
 
@@ -92,7 +111,7 @@ app.listen(3000, () => {
 /signin --> POST success/fail
 /register --> POST = user
 /profile/:userId --> GET = user
-/song --> PUT --> user
+/songs --> GET --> user
 /favorites --> POST = user
 /support --> POST = support
 */
