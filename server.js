@@ -88,6 +88,20 @@ app.get('/profile/:id', (req, res) => {
         .catch(err => res.status(404).json('erro getting user'))
 })
 
+app.get('/songs/:id', (req, res) => {
+    const { id } = req.params;
+    db.select('*').from('songs')
+        .where({ id }) //the same as id: id
+        .then(song => {
+            if (song.length) {
+                res.json(song[0])
+            } else {
+                res.status(400).json('not found buddy')
+            }
+        })
+        .catch(err => res.status(404).json('error getting song'))
+})
+
 
 app.put('/favorites', (req, res) => {
     const { id } = req.body;
