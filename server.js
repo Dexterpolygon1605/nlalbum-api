@@ -51,7 +51,7 @@ app.post('/support', (req, res) => {
         mensagem: mensagem,
         subject: subject
     }).then(res.json(req.body))
-    .catch(err => res.status(400).json('erro inserting message', err))
+        .catch(err => res.status(400).json('erro inserting message', err))
 })
 
 app.post('/register', (req, res) => {
@@ -110,7 +110,6 @@ app.get('/songs', (req, res) => {
         .catch(err => res.status(404).json('error getting song'))
 })
 
-
 app.put('/favorites', (req, res) => {
     const { id } = req.body;
     db('users').where('id', '=', id)
@@ -122,7 +121,16 @@ app.put('/favorites', (req, res) => {
         .catch(err => res.status(400).json('unable to get favorites'))
 })
 
-
+app.put('/songs/favorites', (req, res) => {
+    const { id } = req.body;
+    db('songs').where('id', '=', id)
+        .increment('numfavorites', 1)
+        .returning('numfavorites')
+        .then(favorites => {
+            res.json(favorites[0]);
+        })
+        .catch(err => res.status(400).json('unable to get favorites'))
+})
 
 app.listen(3000, () => {
     console.log('app is running on port 3000')
