@@ -44,6 +44,16 @@ app.post('/signin', (req, res) => {
         .catch(err => res.status(400).json('wrong credentials'))
 })
 
+app.post('/support', (req, res) => {
+    const { email, mensagem, subject } = req.body;
+    db('support').insert({
+        email: email,
+        mensagem: mensagem,
+        subject: subject
+    }).then(res.json(req.body))
+    .catch(err => res.status(400).json('erro inserting message', err))
+})
+
 app.post('/register', (req, res) => {
     const { email, name, password } = req.body;
     const hash = bcrypt.hashSync(password);
@@ -70,7 +80,7 @@ app.post('/register', (req, res) => {
             .catch(trx.rollback)
     })
 
-        .catch(err => res.status(400).json('unable to register'))
+
 })
 
 
@@ -88,13 +98,11 @@ app.get('/profile/:id', (req, res) => {
         .catch(err => res.status(404).json('erro getting user'))
 })
 
-app.get('/songs/:id', (req, res) => {
-    const { id } = req.params;
+app.get('/songs', (req, res) => {
     db.select('*').from('songs')
-        .where({ id }) //the same as id: id
         .then(song => {
             if (song.length) {
-                res.json(song[0])
+                res.json(song)
             } else {
                 res.status(400).json('not found buddy')
             }
@@ -118,14 +126,4 @@ app.put('/favorites', (req, res) => {
 
 app.listen(3000, () => {
     console.log('app is running on port 3000')
-})
-
-/*
-/ --> res = this is working
-/signin --> POST success/fail
-/register --> POST = user
-/profile/:userId --> GET = user
-/songs --> GET --> user
-/favorites --> POST = user
-/support --> POST = support
-*/
+});
